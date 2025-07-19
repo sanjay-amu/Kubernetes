@@ -235,4 +235,186 @@ spec:
 
 ---
 
-Let me know if you'd like to export this as PDF or generate diagrams for each section!
+Absolutely — let’s walk through how to implement each Kubernetes deployment strategy via YAML, specifying exactly:
+	•	Which YAML file to edit
+	•	Which section to modify
+	•	And provide a concrete example for each
+
+⸻
+
+🔁 1. Recreate Strategy
+
+✅ YAML File:
+
+Edit your deployment.yaml file.
+
+🔧 Section to Modify:
+
+spec:
+  strategy:
+    type: Recreate
+
+📄 Full Example:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-container
+        image: my-image:latest
+
+
+⸻
+
+🔄 2. RollingUpdate Strategy (default)
+
+✅ YAML File:
+
+Edit your deployment.yaml
+
+🔧 Section to Modify:
+
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+
+📄 Full Example:
+
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+This allows 1 extra Pod during rollout while keeping all existing ones running.
+
+⸻
+
+🔵 3. Blue-Green Strategy (manual via separate Deployments)
+
+✅ Files Needed:
+	•	deployment-blue.yaml
+	•	deployment-green.yaml
+	•	service.yaml
+
+🔧 Key Part:
+
+Create two deployments (with different labels) and switch the selector in the Service.
+
+📄 Example deployment-blue.yaml:
+
+metadata:
+  name: my-app-blue
+spec:
+  template:
+    metadata:
+      labels:
+        app: my-app
+        version: blue
+
+📄 Example deployment-green.yaml:
+
+metadata:
+  name: my-app-green
+spec:
+  template:
+    metadata:
+      labels:
+        app: my-app
+        version: green
+
+📄 Example service.yaml:
+
+spec:
+  selector:
+    app: my-app
+    version: green  # 👈 switch from blue to green here
+
+You manually flip the version label in the service selector to switch traffic.
+
+⸻
+
+🐤 4. Canary Strategy (manual or via tools like Argo Rollouts)
+
+✅ Files Needed:
+	•	deployment-v1.yaml
+	•	deployment-v2.yaml
+	•	Optional: Ingress with header-based routing or Argo Rollout CR
+
+🔧 Strategy:
+	•	Deploy v1 with label version: stable
+	•	Deploy v2 with label version: canary
+	•	Split traffic in Ingress (manually or via service mesh)
+
+📄 Example Deployments:
+
+# deployment-v1.yaml
+metadata:
+  name: my-app-stable
+spec:
+  template:
+    metadata:
+      labels:
+        app: my-app
+        version: stable
+
+# deployment-v2.yaml
+metadata:
+  name: my-app-canary
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+        version: canary
+
+📄 Example NGINX Ingress Traffic Split:
+
+nginx.ingress.kubernetes.io/canary: "true"
+nginx.ingress.kubernetes.io/canary-weight: "10"
+
+Or use Argo Rollouts with a CRD:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: my-rollout
+spec:
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: { duration: 2m }
+
+
+⸻
+
+🧠 Summary Table:
+
+Strategy	File	Section to Modify	Tools Needed
+Recreate	deployment.yaml	spec.strategy.type: Recreate	None
+RollingUpdate	deployment.yaml	spec.strategy.type: RollingUpdate	None
+Blue-Green	2 deployments + 1 service	Service spec.selector.version	Manual switch
+Canary	2 deployments + Ingress OR Argo Rollout	Ingress annotations or Argo spec	Ingress / ArgoCD
+
+
+⸻
